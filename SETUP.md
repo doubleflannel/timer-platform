@@ -41,17 +41,29 @@ msg_id | room_id | text | color | is_flashing | is_shown | created_at
 https://script.google.com/macros/s/AKfycbwT_mQC1ms5lmOKh_U-LrbTJ-NXjTvSmopf01jkzTMLINVR148vPvHYZRs2s4HnT8nF/exec
 ```
 
-## 2. Deployment
+## 2. Configuration
+
+### Local Configuration
+1. Copy `config.template.js` to `config.local.js`
+2. Update `config.local.js` with your actual URLs:
+   ```javascript
+   window.TimerConfig = {
+       API_URL: 'https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec',
+       SHEET_ID: 'YOUR_SHEET_ID',
+       DEFAULT_ROOM: 'demo'
+   };
+   ```
+
+**Note**: `config.local.js` is gitignored and won't be committed to the repository for security.
+
+## 3. Deployment
 
 ### Live Platform
 - **Operator Interface**: https://timer-platform.vercel.app/
 - **Presenter View**: https://timer-platform.vercel.app/presenter.html
 - **GitHub Repository**: https://github.com/doubleflannel/timer-platform
 
-### Local Setup (Optional)
-Open `index.html` in a web browser to access the operator interface.
-Open `presenter.html` in fullscreen mode for the presenter view.
-
-## Configuration
-
-The platform is pre-configured with the deployed Apps Script API URL. No additional configuration needed for the live version.
+### Local Setup
+1. Configure as described above
+2. Open `index.html` in a web browser for the operator interface
+3. Open `presenter.html` in fullscreen mode for the presenter view

@@ -209,9 +209,20 @@
         </div>
     </div>
 
+    <!-- Configuration -->
+    <script src="config.local.js"></script>
     <script>
-        const API_URL = 'https://script.google.com/macros/s/AKfycbwT_mQC1ms5lmOKh_U-LrbTJ-NXjTvSmopf01jkzTMLINVR148vPvHYZRs2s4HnT8nF/exec';
-        const ROOM_ID = 'demo'; // Default room
+        // Fallback configuration if local config is not available
+        if (typeof TimerConfig === 'undefined') {
+            window.TimerConfig = {
+                API_URL: 'YOUR_API_URL_HERE',
+                DEFAULT_ROOM: 'demo'
+            };
+            console.warn('config.local.js not found. Please copy config.template.js to config.local.js and configure your URLs.');
+        }
+        
+        const API_URL = TimerConfig.API_URL;
+        const ROOM_ID = TimerConfig.DEFAULT_ROOM;
         
         let timers = [];
         let messages = [];
