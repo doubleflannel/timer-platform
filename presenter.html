@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Timer Platform - Presenter View</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #000;
+            color: #fff;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+        
+        .fullscreen-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            text-align: center;
+            position: relative;
+        }
+        
+        .timer-display {
+            font-size: 12rem;
+            font-weight: bold;
+            font-family: 'Courier New', monospace;
+            color: #10b981;
+            text-shadow: 0 0 20px rgba(16, 185, 129, 0.5);
+            margin-bottom: 2rem;
+            transition: color 0.3s ease;
+        }
+        
+        .timer-display.warning {
+            color: #f59e0b;
+            text-shadow: 0 0 20px rgba(245, 158, 11, 0.5);
+        }
+        
+        .timer-display.danger {
+            color: #ef4444;
+            text-shadow: 0 0 20px rgba(239, 68, 68, 0.5);
+        }
+        
+        .timer-display.overtime {
+            color: #ef4444;
+            text-shadow: 0 0 20px rgba(239, 68, 68, 0.8);
+            animation: pulse 1s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        
+        .timer-info {
+            margin-bottom: 3rem;
+        }
+        
+        .timer-title {
+            font-size: 3rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: #e5e7eb;
+        }
+        
+        .timer-speaker {
+            font-size: 2rem;
+            color: #9ca3af;
+            margin-bottom: 1rem;
+        }
+        
+        .timer-mode {
+            font-size: 1.5rem;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+        
+        .status-indicator {
+            position: absolute;
+            top: 2rem;
+            right: 2rem;
+            display: flex;
+            align-items: center;
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+        
+        .status-dot {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            margin-right: 1rem;
+        }
+        
+        .status-stopped .status-dot { background: #6b7280; }
+        .status-running .status-dot { 
+            background: #10b981; 
+            animation: pulse-dot 2s infinite;
+        }
+        .status-paused .status-dot { background: #f59e0b; }
+        
+        @keyframes pulse-dot {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .message-overlay {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0, 0, 0, 0.9);
+            padding: 2rem;
+            transform: translateY(100%);
+            transition: transform 0.3s ease;
+            text-align: center;
+        }
+        
+        .message-overlay.visible {
+            transform: translateY(0);
+        }
+        
+        .message-text {
+            font-size: 2.5rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+        }
+        
+        .message-text.flashing {
+            animation: flash 1s infinite;
+        }
+        
+        @keyframes flash {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+        
+        .no-timer {
+            font-size: 3rem;
+            color: #6b7280;
+            text-align: center;
+        }
+        
+        .controls-hint {
+            position: absolute;
+            bottom: 2rem;
+            left: 2rem;
+            font-size: 1rem;
+            color: #4b5563;
+        }
+        
+        .clock-mode {
+            font-size: 8rem;
+            color: #e5e7eb;
+        }
+        
+        @media (max-width: 768px) {
+            .timer-display {
+                font-size: 6rem;
+            }
+            
+            .timer-title {
+                font-size: 2rem;
+            }
+            
+            .timer-speaker {
+                font-size: 1.5rem;
+            }
+            
+            .message-text {
+                font-size: 1.8rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="fullscreen-container">
+        <div class="status-indicator" id="statusIndicator">
+            <div class="status-dot"></div>
+            <span id="statusText">STOPPED</span>
+        </div>
+        
+        <div id="timerContent">
+            <div class="timer-info" id="timerInfo">
+                <div class="timer-title" id="timerTitle">Loading...</div>
+                <div class="timer-speaker" id="timerSpeaker"></div>
+                <div class="timer-mode" id="timerMode"></div>
+            </div>
+            
+            <div class="timer-display" id="timerDisplay">00:00</div>
+        </div>
+        
+        <div class="message-overlay" id="messageOverlay">
+            <div class="message-text" id="messageText"></div>
+        </div>
+        
+        <div class="controls-hint">
+            Press F11 for fullscreen • ESC to exit fullscreen
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'https://script.google.com/macros/s/AKfycbwT_mQC1ms5lmOKh_U-LrbTJ-NXjTvSmopf01jkzTMLINVR148vPvHYZRs2s4HnT8nF/exec';
+        
+        let currentTimer = null;
+        let currentMessage = null;
+        let timerInterval = null;
+        let roomId = 'demo';
+        
+        // Get room ID from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('room')) {
+            roomId = urlParams.get('room');
+        }
+        
+        async function apiCall(method, data = {}) {
+            const url = method === 'GET' ? 
+                `${API_URL}?${new URLSearchParams(data)}` : 
+                API_URL;
+                
+            const options = {
+                method,
+                headers: { 'Content-Type': 'application/json' },
+                ...(method === 'POST' && { body: JSON.stringify(data) })
+            };
+            
+            try {
+                const response = await fetch(url, options);
+                return await response.json();
+            } catch (error) {
+                console.error('API call failed:', error);
+                return null;
+            }
+        }
+        
+        async function loadTimerData() {
+            try {
+                const data = await apiCall('GET', { action: 'getTimerData', roomId: roomId });
+                
+                if (data && data.timers) {
+                    // Find the currently running timer, or the first timer
+                    const runningTimer = data.timers.find(t => t.status === 'running');
+                    const activeTimer = runningTimer || data.timers.find(t => t.status === 'paused') || data.timers[0];
+                    
+                    if (activeTimer) {
+                        currentTimer = activeTimer;
+                        updateTimerDisplay();
+                    } else {
+                        showNoTimer();
+                    }
+                }
+                
+                if (data && data.messages) {
+                    const activeMessage = data.messages.find(m => m.is_shown);
+                    if (activeMessage !== currentMessage) {
+                        currentMessage = activeMessage;
+                        updateMessageDisplay();
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading timer data:', error);
+                loadDemoData();
+            }
+        }
+        
+        function loadDemoData() {
+            currentTimer = {
+                timer_id: '1',
+                title: 'Demo Timer',
+                speaker: 'Demo Speaker',
+                duration_sec: 1800,
+                status: 'stopped',
+                mode: 'countdown',
+                wrap_yellow_pct: 20,
+                wrap_red_pct: 10
+            };
+            updateTimerDisplay();
+        }
+        
+        function updateTimerDisplay() {
+            if (!currentTimer) {
+                showNoTimer();
+                return;
+            }
+            
+            const titleEl = document.getElementById('timerTitle');
+            const speakerEl = document.getElementById('timerSpeaker');
+            const modeEl = document.getElementById('timerMode');
+            const displayEl = document.getElementById('timerDisplay');
+            const statusEl = document.getElementById('statusIndicator');
+            const statusTextEl = document.getElementById('statusText');
+            
+            titleEl.textContent = currentTimer.title;
+            speakerEl.textContent = currentTimer.speaker;
+            modeEl.textContent = currentTimer.mode;
+            statusTextEl.textContent = currentTimer.status.toUpperCase();
+            
+            statusEl.className = `status-indicator status-${currentTimer.status}`;
+            
+            if (currentTimer.mode === 'clock') {
+                showClock();
+                return;
+            }
+            
+            // Calculate current time
+            let currentTime;
+            if (currentTimer.status === 'running') {
+                const elapsed = Math.floor((Date.now() - new Date(currentTimer.start_time).getTime()) / 1000);
+                currentTime = currentTimer.mode === 'countdown' ? 
+                    currentTimer.duration_sec - elapsed : 
+                    elapsed;
+            } else {
+                currentTime = currentTimer.duration_sec;
+            }
+            
+            displayEl.textContent = formatTime(currentTime);
+            
+            // Apply color coding for countdown timers
+            if (currentTimer.mode === 'countdown') {
+                const percentage = (currentTime / currentTimer.duration_sec) * 100;
+                displayEl.className = 'timer-display';
+                
+                if (currentTime < 0) {
+                    displayEl.classList.add('overtime');
+                } else if (percentage <= currentTimer.wrap_red_pct) {
+                    displayEl.classList.add('danger');
+                } else if (percentage <= currentTimer.wrap_yellow_pct) {
+                    displayEl.classList.add('warning');
+                }
+            }
+            
+            // Show timer content
+            document.getElementById('timerContent').style.display = 'block';
+        }
+        
+        function showClock() {
+            const displayEl = document.getElementById('timerDisplay');
+            displayEl.className = 'timer-display clock-mode';
+            
+            function updateClock() {
+                const now = new Date();
+                displayEl.textContent = now.toLocaleTimeString([], {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: false
+                });
+            }
+            
+            updateClock();
+            if (timerInterval) clearInterval(timerInterval);
+            timerInterval = setInterval(updateClock, 1000);
+        }
+        
+        function showNoTimer() {
+            const content = document.getElementById('timerContent');
+            content.innerHTML = '<div class="no-timer">No Active Timer</div>';
+        }
+        
+        function formatTime(seconds) {
+            const mins = Math.floor(Math.abs(seconds) / 60);
+            const secs = Math.abs(seconds) % 60;
+            const sign = seconds < 0 ? '-' : '';
+            return `${sign}${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }
+        
+        function updateMessageDisplay() {
+            const overlay = document.getElementById('messageOverlay');
+            const textEl = document.getElementById('messageText');
+            
+            if (currentMessage && currentMessage.is_shown) {
+                textEl.textContent = currentMessage.text;
+                textEl.style.color = currentMessage.color;
+                textEl.className = currentMessage.is_flashing ? 'message-text flashing' : 'message-text';
+                overlay.classList.add('visible');
+            } else {
+                overlay.classList.remove('visible');
+            }
+        }
+        
+        // Auto-refresh timer display
+        function startTimerLoop() {
+            if (timerInterval) clearInterval(timerInterval);
+            
+            timerInterval = setInterval(() => {
+                if (currentTimer && currentTimer.status === 'running' && currentTimer.mode !== 'clock') {
+                    updateTimerDisplay();
+                }
+            }, 1000);
+        }
+        
+        // Keyboard controls
+        document.addEventListener('keydown', (e) => {
+            switch(e.key) {
+                case 'F11':
+                    e.preventDefault();
+                    if (!document.fullscreenElement) {
+                        document.documentElement.requestFullscreen();
+                    } else {
+                        document.exitFullscreen();
+                    }
+                    break;
+                case 'Escape':
+                    if (document.fullscreenElement) {
+                        document.exitFullscreen();
+                    }
+                    break;
+            }
+        });
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            loadTimerData();
+            startTimerLoop();
+            
+            // Refresh data every 2 seconds
+            setInterval(loadTimerData, 2000);
+        });
+        
+        // Auto-fullscreen on load (requires user interaction)
+        window.addEventListener('click', () => {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(console.log);
+            }
+        }, { once: true });
+    </script>
+</body>
+</html>
